@@ -1,0 +1,23 @@
+2)    Predicted throughput: 25.621637 Mbps
+      Predicted latency:124 ms
+      Actual throughput: 24.629121 Mbps
+      Actual latency:124.477 ms
+      Explanation of results: I added the latency of each link in the path from H1 to H10. So predicted and actual values are very close is very close. For throuput I predicted the link with minimum throughput.
+
+3.1)  Predicted throughput: 25.12 Mbps
+      Predicted latency: 124 ms
+      Actual throughput: 25.353212 Mbps
+      Actual latency: 124.897 ms
+      Explanation of results: The prediction is close to the answer. The latency is adding all latencies in the path. and throughput is for the minimum.
+
+3.2)  Predicted throughput: 24 Mbps
+      Predicted latency: 125 ms
+      Actual throughput: 23.26 Mbps
+      Actual latency: 125.224 ms
+      Explanation of results: Latency increases and the throughput decreases as the traffic increases on the network.
+
+4)    Predicted throughput:
+      Predicted latency:78 ms
+      Actual throughput:
+      Actual latency: 78.9125
+      Explanation of results:
