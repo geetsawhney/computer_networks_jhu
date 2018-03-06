@@ -14,6 +14,8 @@
 void executeProxyServer(char* , float , int , char* );
 void modifyRequest(char *,char**);
 void allBitrates(char* , int* );
+int getContentLength(char*);
+int getClosest(int* , double ,double , float );
 
 int main(int argc, char **argv) {
 
@@ -25,16 +27,11 @@ int main(int argc, char **argv) {
 
 	char log[strlen(argv[1])];
 	strcpy(log, argv[1]);
-
 	float alpha = atof(argv[2]);
-
 	int listen_port = atoi(argv[3]);
-
 	char www_ip[strlen(argv[4])];
 	strcpy(www_ip, argv[4]);
-
 	executeProxyServer(log,alpha,listen_port,www_ip);
-
 
 	return 0;
 }
@@ -44,8 +41,10 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 	struct sockaddr_in cli_addr, proxy_serv_addr, proxy_cli_addr;
 	int pr_serv_sock, browser_sock,pr_cli_sock;
 	static int xmlFlag=0;
-	int T_cur=10;
+	int T_cur=1000;
 	clock_t start, end;
+	double time_elapsed,T_new;
+	int contentLength;
 
 	if ((pr_serv_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		perror("socket: \n");
@@ -128,10 +127,12 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 
 				//				printf("%s",modified_request);
 				printf("%s",response);
-				//				allBitrates(realXML,bitrates);
+
 
 				sent=send(pr_cli_sock,request, 16000, 0);
 				received = recv(pr_cli_sock,realXML,4096000,0);
+
+				allBitrates(realXML,bitrates);
 				printf("\nafter bitrates");
 				end=clock();
 			}
@@ -160,8 +161,17 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 			received = recv(pr_cli_sock,response,4096000,0);
 
 			end=clock();
+			time_elapsed = (double)(end - start)/CLOCKS_PER_SEC;
+			contentLength=getContentLength(response);
+
 			sent= send(browser_sock,response,4096000,0);
-			printf("%s",response);
+			printf("%s\n",response);
+			printf("%d\n",contentLength);
+			printf("%lf\n",(contentLength/time_elapsed)/1000);
+			T_new=(contentLength/time_elapsed)/1000;
+			T_cur=getClosest(bitrates,T_cur,T_new,alpha);
+
+			printf("\nT_cur== %d\n",T_cur);
 		}
 
 		printf("after else");
@@ -211,5 +221,33 @@ void allBitrates(char* xmlFile, int* bitrates){
 }
 
 int getContentLength(char* response){
-	char copy_response[strlen()];
+
+	char copy_response[strlen(response)];
+	strcpy(copy_response,response);
+	char t1[10];
+
+	char* temp = strstr(copy_response,"Content-Length: ");
+	temp=temp+strlen("Content-Length: ");
+	temp=strtok(temp,"\r\n");
+
+//	printf("%s\n",temp);
+	return atoi(temp);
+}
+
+int getClosest(int* bitrates, double T_cur,double T_new, float alpha){
+
+	double answer= alpha * T_new + (1 - alpha) * T_cur;
+	answer/=1.5;
+//	int i;
+//	for(i=3;i>=0;i--){
+//		if(answer>=bitrates[i])
+//			return bitrates[i];
+//	}
+	if(answer>=1000)
+		return 1000;
+	if(answer>=500)
+		return 500;
+	if(answer>=100)
+		return 100;
+	return 10;
 }
