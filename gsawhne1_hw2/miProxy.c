@@ -115,7 +115,7 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 
 		if(xmlFlag==0){
 			if (strncmp (compose[1],"/vod/big_buck_bunny.f4m",23)==0){
-				printf("\n IF only\n");
+				// printf("\n IF only\n");
 				xmlFlag=1;
 
 				char modified_request[16000];
@@ -183,11 +183,9 @@ void modifyRequest(char * request,char** compose){
 
 	char copy_request[16000],t1[100],t2[100],t3[15800];
 	char* temp=NULL;
-
-
+	
 	strcpy(copy_request,request);
 	strcat(copy_request,"^]");
-
 	temp=strtok(copy_request, " ");
 	strcpy(t1,temp);
 	temp=strtok(NULL," ");
