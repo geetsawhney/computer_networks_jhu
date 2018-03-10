@@ -41,10 +41,14 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 	struct sockaddr_in cli_addr, proxy_serv_addr, proxy_cli_addr;
 	int pr_serv_sock, browser_sock,pr_cli_sock;
 	static int xmlFlag=0;
-	int T_cur=1000;
+	int T_cur=10,T_new;
 	clock_t start, end;
-	double time_elapsed,T_new;
+	double time_elapsed;
 	int contentLength;
+	FILE* fileptr;
+	fileptr=fopen(log,"w");
+	int average=0;
+	int count=0;
 
 	if ((pr_serv_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		perror("socket: \n");
@@ -89,7 +93,7 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 		start=clock(); //start time
 
 
-		printf("\n%s",request);
+		//printf("\n%s",request);
 
 		if((pr_cli_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1){
 			perror("socket: \n");
@@ -99,7 +103,7 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 		host_addr.sin_family=AF_INET;
 		host_addr.sin_port=htons(80);
 
-		if(inet_pton(AF_INET, "127.0.0.1", &host_addr.sin_addr) == -1){
+		if(inet_pton(AF_INET, www_ip, &host_addr.sin_addr) == -1){
 			perror("Unable to translate server address for host \n");
 			exit(-1);
 		}
@@ -115,7 +119,7 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 
 		if(xmlFlag==0){
 			if (strncmp (compose[1],"/vod/big_buck_bunny.f4m",23)==0){
-				// printf("\n IF only\n");
+//				printf("\n IF only\n");
 				xmlFlag=1;
 
 				char modified_request[16000];
@@ -126,37 +130,50 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 				sent= send(browser_sock,response,4096000,0);
 
 				//				printf("%s",modified_request);
-				printf("%s",response);
+				//printf("%s",response);
 
 
-				sent=send(pr_cli_sock,request, 16000, 0);
-				received = recv(pr_cli_sock,realXML,4096000,0);
+				int temp_pr_cli_sock;
+				if((temp_pr_cli_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1){
+					perror("socket: \n");
+					exit(-1);
+				}
+				if(connect(temp_pr_cli_sock, (struct sockaddr *)&host_addr, sizeof(host_addr)) <0){
+					perror("Can't connect to the specified host \n");
+					exit(-1);
+				}
+
+				sent=send(temp_pr_cli_sock,request, 16000, 0);
+				received = recv(temp_pr_cli_sock,realXML,4096000,0);
 
 				allBitrates(realXML,bitrates);
-				printf("\nafter bitrates");
+//				printf("\nafter bitrates");
 				end=clock();
+				close(temp_pr_cli_sock);
 			}
 			else{
-				printf("\nIf Else\n");
+//				printf("\nIf Else\n");
 				sent=send(pr_cli_sock,request, 16000, 0);
 				received = recv(pr_cli_sock,response,4096000,0);
 				end=clock();
 				sent= send(browser_sock,response,4096000,0);
-				printf("%s",response);
+//				printf("%s",response);
 
 			}
 		}
 		else{
-			printf("\nElse\n");
+//			printf("\nElse\n");
 
 			char copy_request[strlen(compose[1])];
 			strcpy(copy_request,compose[1]);
 			char* zz=NULL;
 			zz=strstr(copy_request,"Seg");
 
-			printf("\n%s\n",compose[1]);
+			//printf("\n%s\n",compose[1]);
 
+			char chunk[50];
 			sprintf(request,"GET /vod/%d%s %s",T_cur,zz,compose[2]);
+			sprintf(chunk,"%d%s",T_cur,zz);
 			sent=send(pr_cli_sock,request, 16000, 0);
 			received = recv(pr_cli_sock,response,4096000,0);
 
@@ -165,17 +182,25 @@ void executeProxyServer(char* log, float alpha, int listen_port, char* www_ip){
 			contentLength=getContentLength(response);
 
 			sent= send(browser_sock,response,4096000,0);
-			printf("%s\n",response);
-			printf("%d\n",contentLength);
-			printf("%lf\n",(contentLength/time_elapsed)/1000);
-			T_new=(contentLength/time_elapsed)/1000;
+//			printf("%s\n",response);
+//			printf("%d\n",contentLength);
+//			printf("%lf\n",(contentLength/time_elapsed)/1000);
+			T_new=((contentLength+strlen(response))/time_elapsed)/1000;
+			average=(average*count+T_cur)/++count;
+
+			printf("%lf %d %d %d %s %s\n",time_elapsed,T_new,average,T_cur,www_ip,chunk);
+			fprintf(fileptr,"%lf %d %d %d %s %s\n",time_elapsed,T_new,average,T_cur,www_ip,chunk);
+			fflush(fileptr);
 			T_cur=getClosest(bitrates,T_cur,T_new,alpha);
 
-			printf("\nT_cur== %d\n",T_cur);
+		//	printf("\nT_cur= %d\n",T_cur);
 		}
+		close(pr_cli_sock);
+		close(browser_sock);
 
-		printf("after else");
 	}
+	close(pr_serv_sock);
+	fclose(fileptr);
 }
 
 
@@ -183,9 +208,11 @@ void modifyRequest(char * request,char** compose){
 
 	char copy_request[16000],t1[100],t2[100],t3[15800];
 	char* temp=NULL;
-	
+
+
 	strcpy(copy_request,request);
 	strcat(copy_request,"^]");
+
 	temp=strtok(copy_request, " ");
 	strcpy(t1,temp);
 	temp=strtok(NULL," ");
@@ -228,7 +255,7 @@ int getContentLength(char* response){
 	temp=temp+strlen("Content-Length: ");
 	temp=strtok(temp,"\r\n");
 
-//	printf("%s\n",temp);
+	//	printf("%s\n",temp);
 	return atoi(temp);
 }
 
@@ -236,16 +263,16 @@ int getClosest(int* bitrates, double T_cur,double T_new, float alpha){
 
 	double answer= alpha * T_new + (1 - alpha) * T_cur;
 	answer/=1.5;
-//	int i;
-//	for(i=3;i>=0;i--){
-//		if(answer>=bitrates[i])
-//			return bitrates[i];
-//	}
-	if(answer>=1000)
-		return 1000;
-	if(answer>=500)
-		return 500;
-	if(answer>=100)
-		return 100;
+		int i;
+		for(i=3;i>=0;i--){
+			if(answer>=bitrates[i])
+				return bitrates[i];
+		}
+//	if(answer>=1000)
+//		return 1000;
+//	if(answer>=500)
+//		return 500;
+//	if(answer>=100)
+//		return 100;
 	return 10;
 }
